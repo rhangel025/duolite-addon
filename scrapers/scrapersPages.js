@@ -2,66 +2,55 @@ const fetch = require("node-fetch");
 const cheerio = require("cheerio");
 
 async function scrape(query) {
-    const results = [];
-    const totalPages = 3; // Limitar a 3 páginas para evitar sobrecarga e timeout
+    // A URL de busca no site Vaca Torrent é construída com o parâmetro 's'
+    const url = `https://vacatorrentmov.com/?s=${encodeURIComponent(query)}`;
 
-    for (let page = 1; page <= totalPages; page++) {
-        // A URL de busca paginada é: https://redetorrent.com/index.php?s=QUERY&paged=PAGINA
-        const url = `https://redetorrent.com/index.php?s=${encodeURIComponent(query)}&paged=${page}`;
+    try {
+        // Nota: Em ambientes Node.js mais recentes, pode ser necessário usar 'const fetch = require("node-fetch");'
+        // ou 'const fetch = require("node-fetch").default;' dependendo da versão.
+        const html = await (await fetch(url)).text();
+        const $ = cheerio.load(html);
 
-        try {
-            const html = await (await fetch(url)).text();
-            const $ = cheerio.load(html);
+        const results = [];
 
-            // Seletor para cada item de resultado: .item
-            const items = $(".item");
+        // Seletor para cada item de resultado na página de busca: article.post
+        $("article.post").each((i, el) => {
+            // O título e o link estão dentro de um <a> que está dentro de um <h2>.entry-title
+            const titleElement = $(el).find("h2.entry-title a");
+            const title = titleElement.text().trim();
+            const link = titleElement.attr("href");
 
-            // Se não houver itens, ou se for a primeira página e não houver itens,
-            // assume-se que não há mais resultados e interrompe o loop.
-            if (items.length === 0 && page > 1) {
-                break;
-            } else if (items.length === 0 && page === 1) {
-                // Se não houver resultados na primeira página, não há o que buscar.
-                break;
+            // A qualidade deve ser inferida do título, pois não há seletor de tag (.tag-q) no Vaca Torrent
+            // const qualityElement = $(el).find(".tag-q"); // Removido, não existe no Vaca Torrent
+            let quality = "HD"; // Valor padrão conforme solicitado
+
+            
+                // Tenta inferir do título se a tag não for encontrada
+                if (title.includes("4K")) quality = "4K";
+                else if (title.includes("1080P")) quality = "1080P";
+                else if (title.includes("720P")) quality = "720P";
             }
 
-            items.each((i, el) => {
-                // O título e o link estão dentro de um <a> que está dentro de um <h3>
-                const titleElement = $(el).find("h3 a");
-                const title = titleElement.text().trim();
-                const link = titleElement.attr("href");
+            // O tamanho (sizeMB) é um valor que você decide, conforme o código original
+            const sizeMB = 800; // Valor placeholder
 
-                // Tentativa de extrair a qualidade a partir dos elementos de tag (.tag-q)
-                const qualityElement = $(el).find(".tag-q");
-                let quality = "HD"; // Valor padrão
-
-                if (qualityElement.length) {
-                    quality = qualityElement.text().trim();
-                } else {
-                    // Tenta inferir do título se a tag não for encontrada
-                    if (title.includes("4K")) quality = "4K";
-                    else if (title.includes("1080P")) quality = "1080P";
-                    else if (title.includes("720P")) quality = "720P";
-                }
-
-                results.push({
-                    source: "Rede Torrent (Paginado)",
-                    title,
-                    quality,
-                    sizeMB: 1000, // Valor placeholder
-                    url: link
-                });
+            results.push({
+                source: "Vaca Torrent",
+                title,
+                quality,
+                sizeMB,
+                url: link
             });
-        } catch (error) {
-            console.error(`Erro ao buscar página ${page}:`, error);
-            // Continua para a próxima página em caso de erro
-        }
-    }
+        });
 
-    // Filtra os resultados pelo termo de busca (query)
-    return results.filter(r =>
-        r.title.toLowerCase().includes(query.toLowerCase())
-    );
+        // Filtra os resultados pelo termo de busca (query)
+        return results.filter(r =>
+            r.title.toLowerCase().includes(query.toLowerCase())
+        );
+    } catch (error) {
+        console.error("Erro ao fazer scraping:", error);
+        return [];
+    }
 }
 
 module.exports = { scrape };
