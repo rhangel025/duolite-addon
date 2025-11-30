@@ -2,8 +2,8 @@ const fetch = require("node-fetch");
 const cheerio = require("cheerio");
 
 async function scrape(query) {
-    // A URL de busca no site Rede Torrent é construída com o parâmetro 's'
-    const url = `https://redetorrent.com/index.php?s=${encodeURIComponent(query)}`;
+    // A URL de busca no site Vaca Torrent é construída com o parâmetro 's'
+    const url = `https://vacatorrentmov.com/?s=${encodeURIComponent(query)}`;
 
     try {
         // Nota: Em ambientes Node.js mais recentes, pode ser necessário usar 'const fetch = require("node-fetch");'
@@ -13,20 +13,18 @@ async function scrape(query) {
 
         const results = [];
 
-        // Seletor para cada item de resultado na página de busca: .item
-        $(".item").each((i, el) => {
-            // O título e o link estão dentro de um <a> que está dentro de um <h3>
-            const titleElement = $(el).find("h3 a");
+        // Seletor para cada item de resultado na página de busca: article.post
+        $("article.post").each((i, el) => {
+            // O título e o link estão dentro de um <a> que está dentro de um <h2>.entry-title
+            const titleElement = $(el).find("h2.entry-title a");
             const title = titleElement.text().trim();
             const link = titleElement.attr("href");
 
-            // Tentativa de extrair a qualidade a partir dos elementos de tag (.tag-q)
-            const qualityElement = $(el).find(".tag-q");
+            // A qualidade deve ser inferida do título, pois não há seletor de tag (.tag-q) no Vaca Torrent
+            // const qualityElement = $(el).find(".tag-q"); // Removido, não existe no Vaca Torrent
             let quality = "HD"; // Valor padrão conforme solicitado
 
-            if (qualityElement.length) {
-                quality = qualityElement.text().trim();
-            } else {
+            
                 // Tenta inferir do título se a tag não for encontrada
                 if (title.includes("4K")) quality = "4K";
                 else if (title.includes("1080P")) quality = "1080P";
@@ -37,7 +35,7 @@ async function scrape(query) {
             const sizeMB = 800; // Valor placeholder
 
             results.push({
-                source: "Rede Torrent",
+                source: "Vaca Torrent",
                 title,
                 quality,
                 sizeMB,
