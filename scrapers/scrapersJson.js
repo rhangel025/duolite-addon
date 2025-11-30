@@ -1,27 +1,24 @@
 const fetch = require("node-fetch");
 
-// Scraper genérico que funciona com QUALQUER API JSON pública.
+async function scrape(query) {
+    const url = "https://API_DO_SITE/search?title=" + encodeURIComponent(query);
 
-async function scraperJSON(query) {
-    const url = "https://API_DO_SITE_AQUI/search?q=" + encodeURIComponent(query);
-
-    const response = await fetch(url);
-    const data = await response.json();
+    const res = await fetch(url);
+    const data = await res.json();
 
     const results = [];
 
     for (const item of data.items || []) {
         results.push({
-            source: "FonteJSON",
+            source: "JSON",
             title: item.title,
-            quality: item.quality,
-            sizeMB: item.size,
-            url: item.stream_url,
-            image: item.thumbnail
+            quality: item.quality || "HD",
+            sizeMB: item.size || null,
+            url: item.url
         });
     }
 
     return results;
 }
 
-module.exports = { scraperJSON };
+module.exports = { scrape };
