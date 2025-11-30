@@ -1,13 +1,15 @@
 {
   "name": "duolite-addon",
   "version": "1.0.0",
-  "description": "Addon Duo Lite Stremio",
+  "description": "Addon estilo Brazuca para Stremio (Duo Lite)",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "stremio-addon-sdk": "^1.0.2"
+    "stremio-addon-sdk": "^1.0.2",
+    "node-fetch": "^2.6.7",
+    "cheerio": "^1.0.0-rc.12"
   },
   "engines": {
     "node": ">=18"
