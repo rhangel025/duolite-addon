@@ -1,24 +1,32 @@
 const fetch = require("node-fetch");
+const cheerio = require("cheerio");
 
 async function scrape(query) {
-    const url = "https://API_DO_SITE/search?title=" + encodeURIComponent(query);
+    const url = "https://COLOQUE_A_URL_AQUI";
 
-    const res = await fetch(url);
-    const data = await res.json();
+    const html = await (await fetch(url)).text();
+    const $ = cheerio.load(html);
 
     const results = [];
 
-    for (const item of data.items || []) {
-        results.push({
-            source: "JSON",
-            title: item.title,
-            quality: item.quality || "HD",
-            sizeMB: item.size || null,
-            url: item.url
-        });
-    }
+    $(".ITEM_SELECTOR").each((i, el) => {
+        const title = $(el).find(".TITLE_SELECTOR").text().trim();
+        const link = $(el).find("a").attr("href");
+        const quality = "HD"; // você decide
+        const sizeMB = 800;   // você decide
 
-    return results;
+        results.push({
+            source: "HTML",
+            title,
+            quality,
+            sizeMB,
+            url: link
+        });
+    });
+
+    return results.filter(r =>
+        r.title.toLowerCase().includes(query.toLowerCase())
+    );
 }
 
 module.exports = { scrape };
