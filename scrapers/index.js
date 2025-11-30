@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 
-// Timeout individual por scraper (ms)
+// Tempo máximo por scraper (ms)
 const SCRAPER_TIMEOUT = 8000;
 
 // Função de timeout
@@ -14,7 +14,7 @@ function withTimeout(promise, ms) {
     ]);
 }
 
-// Carrega automaticamente todos os scrapers da pasta
+// Carrega automaticamente todos os scrapers
 function loadScrapers() {
     const scrapers = [];
     const files = fs.readdirSync(__dirname);
@@ -23,23 +23,28 @@ function loadScrapers() {
         if (file === "index.js") continue;
         if (!file.endsWith(".js")) continue;
 
-        const scraper = require(path.join(__dirname, file));
+        try {
+            const scraper = require(path.join(__dirname, file));
 
-        if (typeof scraper.scrape !== "function") {
-            console.log("Ignorando scraper sem função scrape():", file);
-            continue;
+            if (typeof scraper.scrape !== "function") {
+                console.log("Ignorando scraper sem função scrape():", file);
+                continue;
+            }
+
+            scrapers.push({
+                name: file.replace(".js", ""),
+                fn: scraper.scrape
+            });
+
+        } catch (err) {
+            console.error("Erro ao carregar scraper:", file, err);
         }
-
-        scrapers.push({
-            name: file.replace(".js", ""),
-            fn: scraper.scrape
-        });
     }
 
     return scrapers;
 }
 
-// Executa todos os scrapers juntos
+// Roda todos os scrapers em paralelo
 async function scrapeAll(query) {
     const scrapers = loadScrapers();
     const tasks = [];
