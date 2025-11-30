@@ -1,14 +1,12 @@
 const fetch = require("node-fetch");
 const cheerio = require("cheerio");
 
-// Scraper com paginação para sites com múltiplas páginas.
-
-async function scraperPages(query) {
+async function scrape(query) {
     const results = [];
-    const totalPages = 3; // quantas páginas você quer varrer
+    const totalPages = 3;
 
     for (let page = 1; page <= totalPages; page++) {
-        const url = `https://COLOQUE_A_URL_AQUI/page/${page}`;
+        const url = `https://SITE_AQUI/page/${page}`;
 
         const html = await (await fetch(url)).text();
         const $ = cheerio.load(html);
@@ -16,18 +14,12 @@ async function scraperPages(query) {
         $(".ITEM_SELECTOR").each((i, el) => {
             const title = $(el).find(".TITLE_SELECTOR").text().trim();
             const link = $(el).find("a").attr("href");
-            const quality = $(el).find(".QUALITY_SELECTOR").text().trim();
-
-            const sizeRaw = $(el).find(".SIZE_SELECTOR").text();
-            const sizeMB = sizeRaw
-                ? parseInt(sizeRaw.replace(/\D/g, ""))
-                : null;
 
             results.push({
-                source: "FontePages",
+                source: "PAGES",
                 title,
-                quality,
-                sizeMB,
+                quality: "HD",
+                sizeMB: 1000,
                 url: link
             });
         });
@@ -38,4 +30,4 @@ async function scraperPages(query) {
     );
 }
 
-module.exports = { scraperPages };
+module.exports = { scrape };
