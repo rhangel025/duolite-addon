@@ -1,49 +1,68 @@
 const { addonBuilder, serveHTTP } = require("stremio-addon-sdk");
 
-// Manifesto do addon (como se fosse o "cartão de visita" dele)
+const { searchRedetorrent } = require("./scrapers/redetorrent");
+const { searchVacatorrent } = require("./scrapers/vacatorrent");
+const { applyFilters } = require("./utils/filter");
+const cache = require("./utils/cache");
+
+// Manifesto do addon
 const manifest = {
   id: "duolite-addon",
   version: "1.0.0",
-  name: "Duo Lite (Demo)",
-  description: "Addon de exemplo para Stremio, pronto para ser estendido depois",
-  logo: "https://i.imgur.com/TX1n3tI.png",
+  name: "Duo Lite",
+  description: "Addon estilo Brazuca usando fontes múltiplas (demo)",
+  logo: "https://i.postimg.cc/KYBymfrP/duolite.png",
   resources: ["stream"],
   types: ["movie", "series"],
   idPrefixes: ["tt"],
   catalogs: []
 };
 
-// Cria o builder com o manifesto
 const builder = new addonBuilder(manifest);
 
-// Handler de streams (onde você devolve os links pro Stremio)
-builder.defineStreamHandler((args) => {
-  const { type, id } = args;
+// Handler de streams
+builder.defineStreamHandler(async ({ type, id }) => {
+  console.log("Pedido de stream:", { type, id });
 
-  console.log("Pedido de stream:", args);
+  const cacheKey = `${type}:${id}`;
+  const cached = cache.get(cacheKey);
 
-  // Exemplo: só responde quando for um filme com esse ID específico
-  // (tt1254207 = Big Buck Bunny | é só pra testar)
-  if (type === "movie" && id === "tt1254207") {
-    const streams = [
-      {
-        name: "Duo Lite • Demo 1080p",
-        type: "url",
-        url: "http://distribution.bbb3d.renderfarming.net/video/mp4/bbb_sunflower_1080p_30fps_normal.mp4"
-      }
-    ];
-
-    return Promise.resolve({ streams });
+  if (cached) {
+    console.log("Cache HIT:", cacheKey);
+    return { streams: cached };
   }
 
-  // Para qualquer outro item, não retorna nada (vazio)
-  return Promise.resolve({ streams: [] });
+  console.log("Cache MISS:", cacheKey);
+
+  let results = [];
+
+  try {
+    const r1 = await searchRedetorrent({ type, id });
+    const r2 = await searchVacatorrent({ type, id });
+    results = [...r1, ...r2];
+  } catch (err) {
+    console.error("Erro nos scrapers:", err);
+  }
+
+  results = applyFilters(results);
+
+  const streams = results
+    .filter(r => r.magnet || r.url)
+    .map(r => ({
+      name: `Duo Lite • ${r.source || "Fonte"}`,
+      type: r.magnet ? "torrent" : "url",
+      url: r.magnet || r.url
+    }));
+
+  cache.set(cacheKey, streams, 3600); // 1 hora
+
+  return { streams };
 });
 
-// Sobe o servidor HTTP do addon
+// Sobe servidor HTTP da SDK
 const PORT = process.env.PORT || 7000;
 
 serveHTTP(builder.getInterface(), { port: PORT });
 
 console.log(`Duo Lite addon rodando na porta ${PORT}`);
-console.log("Quando estiver no Render, use: https://SEU-DOMINIO.onrender.com/manifest.json no Stremio");
+console.log("Use a URL /manifest.json no Stremio.");
