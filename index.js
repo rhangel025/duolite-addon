@@ -1,7 +1,9 @@
 const { addonBuilder, serveHTTP } = require("stremio-addon-sdk");
 
-const { searchRedetorrent } = require("./scrapers/redetorrent");
-const { searchVacatorrent } = require("./scrapers/vacatorrent");
+const { scraperHTML } = require("./scrapers/scraperHtml");
+const { scraperJSON } = require("./scrapers/scraperJson");
+const { scraperPages } = require("./scrapers/scraperPages");
+
 const { applyFilters } = require("./utils/filter");
 const cache = require("./utils/cache");
 const { scoreResult, formatStreamName } = require("./utils/quality");
@@ -9,9 +11,9 @@ const { scoreResult, formatStreamName } = require("./utils/quality");
 // Manifesto do addon
 const manifest = {
   id: "duolite-addon",
-  version: "1.1.0",
+  version: "2.0.0",
   name: "Duo Lite",
-  description: "Addon estilo Brazuca (demo avançado) com múltiplas fontes e ordenação de qualidade.",
+  description: "Addon estilo Brazuca (versão avançada com múltiplas fontes).",
   logo: "https://i.postimg.cc/KYBymfrP/duolite.png",
   resources: ["stream"],
   types: ["movie", "series"],
@@ -21,55 +23,53 @@ const manifest = {
 
 const builder = new addonBuilder(manifest);
 
-// Handler de streams
+// Handler dos streams
 builder.defineStreamHandler(async ({ type, id }) => {
-  console.log("Pedido de stream:", { type, id });
+  console.log("Stream solicitado:", { type, id });
 
   const cacheKey = `${type}:${id}`;
   const cached = cache.get(cacheKey);
 
   if (cached) {
-    console.log("Cache HIT:", cacheKey);
+    console.log("CACHE HIT:", cacheKey);
     return { streams: cached };
   }
 
-  console.log("Cache MISS:", cacheKey);
+  console.log("CACHE MISS:", cacheKey);
 
   let results = [];
 
   try {
-    const r1 = await searchRedetorrent({ type, id });
-    const r2 = await searchVacatorrent({ type, id });
+    const r1 = await scraperHTML(id);
+    const r2 = await scraperJSON(id);
+    const r3 = await scraperPages(id);
 
-    results = [...r1, ...r2];
+    results = [...r1, ...r2, ...r3];
   } catch (err) {
     console.error("Erro nos scrapers:", err);
   }
 
-  // Aplica filtros (remove duplicados por url/magnet)
+  // Remove duplicados
   results = applyFilters(results);
 
-  // Ordena por score (qualidade + seeds)
+  // Ordena por qualidade e seeds
   results.sort((a, b) => scoreResult(b) - scoreResult(a));
 
-  // Transforma resultados em streams pro Stremio
+  // Monta streams finais para o Stremio
   const streams = results
-    .filter((r) => r.magnet || r.url)
-    .map((r) => ({
+    .filter(r => r.url || r.magnet)
+    .map(r => ({
       name: formatStreamName(r),
       type: r.magnet ? "torrent" : "url",
       url: r.magnet || r.url
     }));
 
-  cache.set(cacheKey, streams, 3600); // 1 hora de cache
+  cache.set(cacheKey, streams, 3600); // 1h cache
 
   return { streams };
 });
 
-// Sobe servidor HTTP da SDK
+// Servidor
 const PORT = process.env.PORT || 7000;
-
 serveHTTP(builder.getInterface(), { port: PORT });
-
-console.log(`Duo Lite addon rodando na porta ${PORT}`);
-console.log("Use a URL /manifest.json no Stremio.");
+console.log(`Duo Lite rodando na porta ${PORT}`);
