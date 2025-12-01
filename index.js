@@ -1,6 +1,6 @@
 const { addonBuilder, serveHTTP } = require("stremio-addon-sdk");
 
-const scrapeAll = require("./scrapers"); // Scraper Manager
+const scrapeAll = require("./scrapers");
 const { applyFilters } = require("./utils/filter");
 const cache = require("./utils/cache");
 const { scoreResult, formatStreamName } = require("./utils/quality");
@@ -8,29 +8,30 @@ const { scoreResult, formatStreamName } = require("./utils/quality");
 const { unlockRealDebrid } = require("./utils/realdebrid");
 const { unlockAllDebrid } = require("./utils/alldebrid");
 
-// MANIFESTO DO ADDON
 const manifest = {
   id: "duolite-addon",
   version: "3.0.0",
   name: "Duo Lite",
   description: "Addon estilo Brazuca com múltiplos scrapers + suporte RD/AD",
   logo: "https://i.postimg.cc/KYBymfrP/duolite.png",
+
   resources: ["stream"],
   types: ["movie", "series"],
   idPrefixes: ["tt"],
 
+  // CAMPOS DE CONFIGURAÇÃO (CORRETO)
   config: [
     {
       key: "realdebrid_api",
       type: "text",
       name: "Real-Debrid API Token",
-      description: "Cole aqui o token da API Real-Debrid"
+      description: "Cole aqui seu token da API Real-Debrid"
     },
     {
       key: "alldebrid_api",
       type: "text",
       name: "AllDebrid API Key",
-      description: "Cole aqui sua API Key do AllDebrid"
+      description: "Cole aqui sua chave da API AllDebrid"
     }
   ],
 
@@ -39,10 +40,9 @@ const manifest = {
 
 const builder = new addonBuilder(manifest);
 
-
-// STREAM HANDLER
 builder.defineStreamHandler(async ({ type, id, config }) => {
-  console.log("Pedido de stream:", { type, id });
+
+  console.log("Recebido:", { type, id });
 
   const rdKey = config.realdebrid_api || null;
   const adKey = config.alldebrid_api || null;
@@ -50,63 +50,45 @@ builder.defineStreamHandler(async ({ type, id, config }) => {
   // CACHE
   const cacheKey = `${type}:${id}:${rdKey}:${adKey}`;
   const cached = cache.get(cacheKey);
+  if (cached) return { streams: cached };
 
-  if (cached) {
-    console.log("CACHE HIT:", cacheKey);
-    return { streams: cached };
-  }
-
-  console.log("CACHE MISS:", cacheKey);
-
-  // RODAR TODOS SCRAPERS
+  // RODAR SCRAPERS
   let results = await scrapeAll(id);
 
-  // REMOVER DUPLICADOS
   results = applyFilters(results);
-
-  // ORDENAR POR QUALIDADE
   results.sort((a, b) => scoreResult(b) - scoreResult(a));
 
-  // DESBLOQUEAR LINKS SE USUÁRIO TIVER API
-  const finalStreams = [];
+  const final = [];
 
-  for (const r of results) {
+  for (let r of results) {
     let url = r.url || r.magnet;
 
-    // Real-Debrid
     if (rdKey && url.startsWith("http")) {
       try {
-        const unlocked = await unlockRealDebrid(url, rdKey);
-        if (unlocked) url = unlocked;
-      } catch (e) {
-        console.log("Erro RD:", e);
-      }
+        const unlock = await unlockRealDebrid(url, rdKey);
+        if (unlock) url = unlock;
+      } catch (e) {}
     }
 
-    // AllDebrid
     if (adKey && url.startsWith("http")) {
       try {
-        const unlocked = await unlockAllDebrid(url, adKey);
-        if (unlocked) url = unlocked;
-      } catch (e) {
-        console.log("Erro AD:", e);
-      }
+        const unlock = await unlockAllDebrid(url, adKey);
+        if (unlock) url = unlock;
+      } catch (e) {}
     }
 
-    finalStreams.push({
+    final.push({
       name: formatStreamName(r),
       type: r.magnet ? "torrent" : "url",
       url
     });
   }
 
-  cache.set(cacheKey, finalStreams, 3600); // 1h
+  cache.set(cacheKey, final, 3600);
 
-  return { streams: finalStreams };
+  return { streams: final };
 });
 
-// SERVIDOR
-const PORT = process.env.PORT || 7000;
-serveHTTP(builder.getInterface(), { port: PORT });
+serveHTTP(builder.getInterface(), { port: process.env.PORT || 7000 });
 
-console.log("Duo Lite rodando na porta " + PORT);
+console.log("Duo Lite rodando…");
