@@ -2,11 +2,11 @@ const manifest = {
   id: "duolite-addon",
   version: "3.0.0",
   name: "Duo Lite",
-  description: "Addon estilo Brazuca com múltiplos scrapers e suporte a RD/AD.",
+  description: "Addon estilo com múltiplos Servidores e suporte a RD/AD.",
   logo: "https://i.imgur.com/TX1n3tI.png",
 
   resources: ["stream"],
-  types: ["movie", "series"],
+  types: ["Filmes", "Séries"],
   idPrefixes: ["tt"],
 
   config: [
